@@ -1,0 +1,26 @@
+Noteloom License
+================
+
+Copyright (c) 2025 Shuvankar Debnath
+
+Permission is hereby granted to any user of this software to use, copy, and
+modify the software for personal and educational purposes only, subject to
+the following conditions:
+
+1. This software may not be redistributed, sublicensed, or sold without
+   explicit written permission from the author.
+2. This software is provided "as is", without warranty of any kind, express
+   or implied, including but not limited to the warranties of merchantability,
+   fitness for a particular purpose, and noninfringement.
+3. The author shall not be liable for any claim, damages, or other liability,
+   whether in an action of contract, tort, or otherwise, arising from, out of,
+   or in connection with the software or the use or other dealings in the
+   software.
+4. Any project or product that integrates this software must include a
+   visible attribution: "Powered by Noteloom Backend © Shuvankar Debnath".
+
+By using this software, you agree to the above terms.
+
+-------------------------
+Author: Shuvankar Debnath
+Date: 2025
