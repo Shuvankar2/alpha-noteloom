@@ -31,6 +31,8 @@ import {
   sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
 } from "firebase/auth";
 import {
   doc,
@@ -436,10 +438,31 @@ function RoleSelect({ role, setRole }) {
 /* ---------- Google Sign In ---------- */
 function GoogleSignIn() {
   const provider = new GoogleAuthProvider();
+
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then(async (res) => {
+        if (res?.user) {
+          const userRef = doc(db, "users", res.user.uid);
+          const snap = await getDoc(userRef);
+          if (!snap.exists()) {
+            await setDoc(userRef, {
+              email: res.user.email,
+              fullName: res.user.displayName,
+              role: "Student",
+              createdAt: new Date(),
+            });
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Google redirect sign-in error:", err);
+      });
+  }, []);
+
   const handle = async () => {
     try {
       const res = await signInWithPopup(auth, provider);
-      // create profile doc if missing
       const userRef = doc(db, "users", res.user.uid);
       const snap = await getDoc(userRef);
       if (!snap.exists()) {
@@ -451,11 +474,22 @@ function GoogleSignIn() {
         });
       }
     } catch (err) {
-      alert(err.message);
+      if (err.code === "auth/popup-blocked") {
+        try {
+          await signInWithRedirect(auth, provider);
+        } catch (redirectErr) {
+          alert(redirectErr.message);
+        }
+      } else if (err.code === "auth/unauthorized-domain") {
+        alert("Domain Unauthorized! Please add '" + window.location.hostname + "' to Firebase Console -> Authentication -> Settings -> Authorized Domains.");
+      } else {
+        alert(err.message);
+      }
     }
   };
+
   return (
-    <button onClick={handle} className="mt-4 px-4 py-2 rounded-2xl border">
+    <button onClick={handle} className="mt-4 px-4 py-2 rounded-2xl border hover:bg-slate-100 dark:hover:bg-slate-800 transition">
       Sign in with Google
     </button>
   );
