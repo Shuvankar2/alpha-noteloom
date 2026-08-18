@@ -21,8 +21,10 @@ import {
   Users,
   Settings,
   PenBoxIcon,
+  Eye,
+  EyeOff,
 } from "lucide-react";
-import { Routes, Route, useNavigate, Link } from "react-router-dom";
+import { Routes, Route, useNavigate, useLocation, Link } from "react-router-dom";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -119,6 +121,7 @@ export default function App() {
   const { theme, setTheme } = useTheme();
   const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -155,7 +158,7 @@ export default function App() {
       />
       <main className="max-w-6xl mx-auto px-4 pb-16">
         <AnimatePresence mode="wait">
-          <Routes>
+          <Routes location={location} key={location.pathname}>
             <Route
               path="/"
               element={<Landing onLogin={() => navigate("/login")} />}
@@ -293,6 +296,7 @@ function AuthLogin() {
   const [role, setRole] = useState("Student");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
@@ -301,7 +305,7 @@ function AuthLogin() {
     setError("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged will redirect
+      navigate("/dashboard");
     } catch (err) {
       setError(err.message);
     }
@@ -342,18 +346,26 @@ function AuthLogin() {
             </div>
             <div>
               <label className="text-sm font-medium">Password</label>
-              <div className="mt-1 flex items-center rounded-2xl border border-slate-300 dark:border-slate-700 overflow-hidden">
+              <div className="mt-1 flex items-center rounded-2xl border border-slate-300 dark:border-slate-700 overflow-hidden relative">
                 <div className="px-3 opacity-70">
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   placeholder="••••••••"
-                  className="w-full px-3 py-3 bg-transparent outline-none"
+                  className="w-full px-3 py-3 pr-10 bg-transparent outline-none"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
             {error && (
@@ -1442,16 +1454,32 @@ function ModuleView({ type, onBack, role, user }) {
 
 /* ---------- UI helpers ---------- */
 function Field({ label, value, onChange, type = "text", placeholder }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === "password";
+  const inputType = isPassword ? (showPassword ? "text" : "password") : type;
+
   return (
     <div>
       <label className="text-sm font-medium">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="mt-1 w-full px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-transparent"
-      />
+      <div className="mt-1 relative flex items-center">
+        <input
+          type={inputType}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-4 py-2.5 pr-10 rounded-2xl border border-slate-300 dark:border-slate-700 bg-transparent"
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition focus:outline-none"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
