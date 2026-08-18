@@ -121,11 +121,6 @@ export default function App() {
   const { theme, setTheme } = useTheme();
   const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
-  const location = useLocation();
-
-  // Store navigate in a ref so the auth listener never needs to be re-subscribed
-  const navigateRef = React.useRef(navigate);
-  useEffect(() => { navigateRef.current = navigate; }, [navigate]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -140,14 +135,12 @@ export default function App() {
           console.warn("Firestore profile fetch error:", err);
         }
         setCurrentUser({ uid: u.uid, ...profile });
-        navigateRef.current("/dashboard");
       } else {
         setCurrentUser(null);
       }
     });
     return () => unsub();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — listener must only be subscribed once
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#dbe7fb] to-slate-100 dark:from-slate-950 dark:to-slate-900 text-slate-900 dark:text-slate-100">
@@ -162,23 +155,30 @@ export default function App() {
         }}
       />
       <main className="max-w-6xl mx-auto px-4 pb-16">
-        <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
-            <Route
-              path="/"
-              element={<Landing onLogin={() => navigate("/login")} />}
-            />
-            <Route path="/login" element={<AuthLogin />} />
-            <Route path="/forgot" element={<ForgotPassword />} />
-            <Route path="/signup/student" element={<SignupStudent />} />
-            <Route path="/signup/faculty" element={<SignupFaculty />} />
-            <Route path="/signup/admin" element={<SignupAdmin />} />
-            <Route
-              path="/dashboard/*"
-              element={<DashboardPortal currentUser={currentUser} />}
-            />
-          </Routes>
-        </AnimatePresence>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Landing
+                currentUser={currentUser}
+                onLogin={() => navigate(currentUser ? "/dashboard" : "/login")}
+              />
+            }
+          />
+          <Route path="/login" element={<AuthLogin currentUser={currentUser} />} />
+          <Route path="/forgot" element={<ForgotPassword />} />
+          <Route path="/signup/student" element={<SignupStudent currentUser={currentUser} />} />
+          <Route path="/signup/faculty" element={<SignupFaculty currentUser={currentUser} />} />
+          <Route path="/signup/admin" element={<SignupAdmin currentUser={currentUser} />} />
+          <Route
+            path="/dashboard"
+            element={<DashboardPortal currentUser={currentUser} />}
+          />
+          <Route
+            path="/dashboard/*"
+            element={<DashboardPortal currentUser={currentUser} />}
+          />
+        </Routes>
       </main>
     </div>
   );
@@ -297,22 +297,32 @@ function TileBackground() {
 }
 
 /* ---------- Auth Login ---------- */
-function AuthLogin() {
+function AuthLogin({ currentUser }) {
   const [role, setRole] = useState("Student");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (currentUser) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [currentUser, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // Navigation handled by onAuthStateChanged in App
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -380,9 +390,10 @@ function AuthLogin() {
             )}
             <button
               type="submit"
-              className="w-full px-5 py-3 rounded-2xl bg-indigo-600 text-white shadow hover:brightness-110"
+              disabled={loading}
+              className="w-full px-5 py-3 rounded-2xl bg-indigo-600 text-white shadow hover:brightness-110 disabled:opacity-50"
             >
-              Login
+              {loading ? "Logging in..." : "Login"}
             </button>
           </form>
           <div className="flex justify-between items-center mt-4 text-sm">
@@ -406,7 +417,7 @@ function AuthLogin() {
         <div className="rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-xl bg-white/60 dark:bg-slate-900/60 backdrop-blur">
           <h3 className="font-semibold">Quick actions</h3>
           <p className="mt-2 text-sm opacity-80">Or sign in with Google</p>
-          <GoogleSignIn />
+          <GoogleSignIn currentUser={currentUser} />
         </div>
       </div>
     </div>
@@ -456,10 +467,16 @@ function RoleSelect({ role, setRole }) {
 }
 
 /* ---------- Google Sign In ---------- */
-function GoogleSignIn() {
+function GoogleSignIn({ currentUser }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (currentUser) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [currentUser, navigate]);
 
   useEffect(() => {
     getRedirectResult(auth)
@@ -479,14 +496,14 @@ function GoogleSignIn() {
           } catch (docErr) {
             console.warn("Firestore redirect profile warning:", docErr);
           }
-          // Navigation handled by onAuthStateChanged in App
+          navigate("/dashboard", { replace: true });
         }
       })
       .catch((err) => {
         console.error("Google redirect sign-in error:", err);
         setErrorMsg(err.message);
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [navigate]);
 
   const handle = async () => {
     setLoading(true);
@@ -510,7 +527,7 @@ function GoogleSignIn() {
       } catch (docErr) {
         console.warn("Firestore profile creation warning:", docErr);
       }
-      // Navigation handled by onAuthStateChanged in App
+      navigate("/dashboard", { replace: true });
     } catch (err) {
       if (err.code === "auth/popup-blocked") {
         try {
