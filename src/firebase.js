@@ -4,10 +4,16 @@ import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// IMPORTANT: Using the keys provided
+// Determine authDomain: on Vercel/custom domain use current hostname so /__/auth is same-origin via Vercel proxy
+const isBrowser = typeof window !== 'undefined';
+const isLocal = isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const dynamicAuthDomain = isBrowser && !isLocal
+  ? window.location.hostname
+  : 'erp-notes-solutions.firebaseapp.com';
+
 const firebaseConfig = {
   apiKey: "AIzaSyDpHB7q-rERKFK7Y8U__B3LBZ72BOLclTU",
-  authDomain: "erp-notes-solutions.firebaseapp.com",
+  authDomain: dynamicAuthDomain,
   projectId: "erp-notes-solutions",
   storageBucket: "erp-notes-solutions.firebasestorage.app",
   messagingSenderId: "690817086461",

@@ -10,6 +10,10 @@
       "destination": "/api/index.js"
     },
     {
+      "source": "/__/auth/(.*)",
+      "destination": "https://erp-notes-solutions.firebaseapp.com/__/auth/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
