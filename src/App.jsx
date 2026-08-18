@@ -123,6 +123,10 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Store navigate in a ref so the auth listener never needs to be re-subscribed
+  const navigateRef = React.useRef(navigate);
+  useEffect(() => { navigateRef.current = navigate; }, [navigate]);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
@@ -136,13 +140,14 @@ export default function App() {
           console.warn("Firestore profile fetch error:", err);
         }
         setCurrentUser({ uid: u.uid, ...profile });
-        navigate("/dashboard");
+        navigateRef.current("/dashboard");
       } else {
         setCurrentUser(null);
       }
     });
     return () => unsub();
-  }, [navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — listener must only be subscribed once
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#dbe7fb] to-slate-100 dark:from-slate-950 dark:to-slate-900 text-slate-900 dark:text-slate-100">
@@ -305,7 +310,7 @@ function AuthLogin() {
     setError("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate("/dashboard");
+      // Navigation handled by onAuthStateChanged in App
     } catch (err) {
       setError(err.message);
     }
@@ -474,14 +479,14 @@ function GoogleSignIn() {
           } catch (docErr) {
             console.warn("Firestore redirect profile warning:", docErr);
           }
-          navigate("/dashboard");
+          // Navigation handled by onAuthStateChanged in App
         }
       })
       .catch((err) => {
         console.error("Google redirect sign-in error:", err);
         setErrorMsg(err.message);
       });
-  }, [navigate]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handle = async () => {
     setLoading(true);
@@ -505,7 +510,7 @@ function GoogleSignIn() {
       } catch (docErr) {
         console.warn("Firestore profile creation warning:", docErr);
       }
-      navigate("/dashboard");
+      // Navigation handled by onAuthStateChanged in App
     } catch (err) {
       if (err.code === "auth/popup-blocked") {
         try {
