@@ -19,7 +19,6 @@ node_modules
 .env.production.local
 noteloom-backend/.env
 noteloom-backend/uploads/
-src/firebase.js
 
 # Editor & OS files
 .DS_Store
