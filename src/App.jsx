@@ -123,20 +123,23 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
-        // load profile
-        const snap = await getDoc(doc(db, "users", u.uid));
-        const profile = snap.exists()
-          ? snap.data()
-          : { email: u.email, role: "Student" };
+        let profile = { email: u.email, role: "Student", fullName: u.displayName || u.email };
+        try {
+          const snap = await getDoc(doc(db, "users", u.uid));
+          if (snap.exists()) {
+            profile = { ...profile, ...snap.data() };
+          }
+        } catch (err) {
+          console.warn("Firestore profile fetch error:", err);
+        }
         setCurrentUser({ uid: u.uid, ...profile });
         navigate("/dashboard");
       } else {
         setCurrentUser(null);
-        navigate("/");
       }
     });
     return () => unsub();
-  }, []);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#dbe7fb] to-slate-100 dark:from-slate-950 dark:to-slate-900 text-slate-900 dark:text-slate-100">
@@ -445,15 +448,19 @@ function GoogleSignIn() {
     getRedirectResult(auth)
       .then(async (res) => {
         if (res?.user) {
-          const userRef = doc(db, "users", res.user.uid);
-          const snap = await getDoc(userRef);
-          if (!snap.exists()) {
-            await setDoc(userRef, {
-              email: res.user.email,
-              fullName: res.user.displayName,
-              role: "Student",
-              createdAt: new Date(),
-            });
+          try {
+            const userRef = doc(db, "users", res.user.uid);
+            const snap = await getDoc(userRef);
+            if (!snap.exists()) {
+              await setDoc(userRef, {
+                email: res.user.email,
+                fullName: res.user.displayName || res.user.email,
+                role: "Student",
+                createdAt: new Date(),
+              });
+            }
+          } catch (docErr) {
+            console.warn("Firestore redirect profile warning:", docErr);
           }
           navigate("/dashboard");
         }
@@ -472,15 +479,19 @@ function GoogleSignIn() {
 
     try {
       const res = await signInWithPopup(auth, provider);
-      const userRef = doc(db, "users", res.user.uid);
-      const snap = await getDoc(userRef);
-      if (!snap.exists()) {
-        await setDoc(userRef, {
-          email: res.user.email,
-          fullName: res.user.displayName,
-          role: "Student",
-          createdAt: new Date(),
-        });
+      try {
+        const userRef = doc(db, "users", res.user.uid);
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) {
+          await setDoc(userRef, {
+            email: res.user.email,
+            fullName: res.user.displayName || res.user.email,
+            role: "Student",
+            createdAt: new Date(),
+          });
+        }
+      } catch (docErr) {
+        console.warn("Firestore profile creation warning:", docErr);
       }
       navigate("/dashboard");
     } catch (err) {
