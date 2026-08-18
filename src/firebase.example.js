@@ -1,17 +1,16 @@
-// src/firebase.js
+// src/firebase.example.js
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// IMPORTANT: Using the keys provided
 const firebaseConfig = {
-  apiKey: "AIzaSyDpHB7q-rERKFK7Y8U__B3LBZ72BOLclTU",
-  authDomain: "erp-notes-solutions.firebaseapp.com",
-  projectId: "erp-notes-solutions",
-  storageBucket: "erp-notes-solutions.firebasestorage.app",
-  messagingSenderId: "690817086461",
-  appId: "1:690817086461:web:deb62720d2e3e01276df94"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
