@@ -123,36 +123,8 @@ export default function App() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Process any Google redirect result on app load
-    getRedirectResult(auth)
-      .then(async (res) => {
-        if (res?.user) {
-          const u = res.user;
-          let profile = { email: u.email, role: "Student", fullName: u.displayName || u.email };
-          try {
-            const userRef = doc(db, "users", u.uid);
-            const snap = await getDoc(userRef);
-            if (!snap.exists()) {
-              await setDoc(userRef, {
-                email: u.email,
-                fullName: u.displayName || u.email,
-                role: "Student",
-                createdAt: new Date(),
-              });
-            } else {
-              profile = { ...profile, ...snap.data() };
-            }
-          } catch (err) {
-            console.warn("Firestore redirect profile warning:", err);
-          }
-          setCurrentUser({ uid: u.uid, ...profile });
-          navigate("/dashboard", { replace: true });
-        }
-      })
-      .catch((err) => {
-        console.error("Global getRedirectResult error:", err);
-      });
-
+    // onAuthStateChanged: fires on every auth state change (login, logout, token refresh).
+    // Also fires once on mount if there's a persisted session (e.g. after Google popup).
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
         let profile = { email: u.email, role: "Student", fullName: u.displayName || u.email };
@@ -170,7 +142,7 @@ export default function App() {
       }
     });
     return () => unsub();
-  }, [navigate]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#dbe7fb] to-slate-100 dark:from-slate-950 dark:to-slate-900 text-slate-900 dark:text-slate-100">
@@ -508,6 +480,36 @@ function GoogleSignIn({ currentUser }) {
     }
   }, [currentUser, navigate]);
 
+  // Handle return from signInWithRedirect (only when user clicked the redirect link)
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then(async (res) => {
+        if (!res?.user) return;
+        const u = res.user;
+        try {
+          const userRef = doc(db, "users", u.uid);
+          const snap = await getDoc(userRef);
+          if (!snap.exists()) {
+            await setDoc(userRef, {
+              email: u.email,
+              fullName: u.displayName || u.email,
+              role: "Student",
+              createdAt: new Date(),
+            });
+          }
+        } catch (e) {
+          console.warn("Firestore redirect profile:", e);
+        }
+        navigate("/dashboard", { replace: true });
+      })
+      .catch((err) => {
+        if (err.code !== "auth/no-auth-event") {
+          setErrorMsg(`Redirect sign-in error (${err.code}): ${err.message}`);
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handlePopup = async () => {
     setLoading(true);
     setErrorMsg("");
@@ -536,22 +538,22 @@ function GoogleSignIn({ currentUser }) {
       }
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      console.error("Google popup sign-in error:", err);
-      if (err.code === "auth/popup-blocked" || err.code === "auth/popup-closed-by-user") {
-        setErrorMsg("Popup blocked or closed by browser. Initiating redirect sign-in...");
-        try {
-          await signInWithRedirect(auth, provider);
-        } catch (redirectErr) {
-          setErrorMsg(redirectErr.message);
-        }
+      console.error("Google popup sign-in error:", err.code, err.message);
+      if (err.code === "auth/popup-blocked") {
+        setErrorMsg(
+          "🚫 Popup was blocked by your browser. Please allow popups for this site in your browser settings, or use the 'Sign in via Redirect' link below."
+        );
+      } else if (err.code === "auth/popup-closed-by-user") {
+        // User intentionally closed popup — no error shown
+        setErrorMsg("");
       } else if (err.code === "auth/unauthorized-domain") {
         setErrorMsg(
-          "Domain Unauthorized! Please add '" +
+          "❌ Domain Unauthorized. Add '" +
             window.location.hostname +
-            "' to Firebase Console -> Authentication -> Settings -> Authorized Domains."
+            "' to Firebase Console → Authentication → Settings → Authorized Domains."
         );
       } else {
-        setErrorMsg(`Google Auth Error (${err.code}): ${err.message}`);
+        setErrorMsg(`Google Sign-In Error (${err.code}): ${err.message}`);
       }
     } finally {
       setLoading(false);
