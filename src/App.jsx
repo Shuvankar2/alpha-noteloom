@@ -123,6 +123,36 @@ export default function App() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Process any Google redirect result on app load
+    getRedirectResult(auth)
+      .then(async (res) => {
+        if (res?.user) {
+          const u = res.user;
+          let profile = { email: u.email, role: "Student", fullName: u.displayName || u.email };
+          try {
+            const userRef = doc(db, "users", u.uid);
+            const snap = await getDoc(userRef);
+            if (!snap.exists()) {
+              await setDoc(userRef, {
+                email: u.email,
+                fullName: u.displayName || u.email,
+                role: "Student",
+                createdAt: new Date(),
+              });
+            } else {
+              profile = { ...profile, ...snap.data() };
+            }
+          } catch (err) {
+            console.warn("Firestore redirect profile warning:", err);
+          }
+          setCurrentUser({ uid: u.uid, ...profile });
+          navigate("/dashboard", { replace: true });
+        }
+      })
+      .catch((err) => {
+        console.error("Global getRedirectResult error:", err);
+      });
+
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
         let profile = { email: u.email, role: "Student", fullName: u.displayName || u.email };
@@ -140,7 +170,7 @@ export default function App() {
       }
     });
     return () => unsub();
-  }, []);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#dbe7fb] to-slate-100 dark:from-slate-950 dark:to-slate-900 text-slate-900 dark:text-slate-100">
@@ -478,34 +508,7 @@ function GoogleSignIn({ currentUser }) {
     }
   }, [currentUser, navigate]);
 
-  useEffect(() => {
-    getRedirectResult(auth)
-      .then(async (res) => {
-        if (res?.user) {
-          try {
-            const userRef = doc(db, "users", res.user.uid);
-            const snap = await getDoc(userRef);
-            if (!snap.exists()) {
-              await setDoc(userRef, {
-                email: res.user.email,
-                fullName: res.user.displayName || res.user.email,
-                role: "Student",
-                createdAt: new Date(),
-              });
-            }
-          } catch (docErr) {
-            console.warn("Firestore redirect profile warning:", docErr);
-          }
-          navigate("/dashboard", { replace: true });
-        }
-      })
-      .catch((err) => {
-        console.error("Google redirect sign-in error:", err);
-        setErrorMsg(err.message);
-      });
-  }, [navigate]);
-
-  const handle = async () => {
+  const handlePopup = async () => {
     setLoading(true);
     setErrorMsg("");
     const provider = new GoogleAuthProvider();
@@ -513,23 +516,29 @@ function GoogleSignIn({ currentUser }) {
 
     try {
       const res = await signInWithPopup(auth, provider);
+      const u = res.user;
+      let profile = { email: u.email, role: "Student", fullName: u.displayName || u.email };
       try {
-        const userRef = doc(db, "users", res.user.uid);
+        const userRef = doc(db, "users", u.uid);
         const snap = await getDoc(userRef);
         if (!snap.exists()) {
           await setDoc(userRef, {
-            email: res.user.email,
-            fullName: res.user.displayName || res.user.email,
+            email: u.email,
+            fullName: u.displayName || u.email,
             role: "Student",
             createdAt: new Date(),
           });
+        } else {
+          profile = { ...profile, ...snap.data() };
         }
       } catch (docErr) {
         console.warn("Firestore profile creation warning:", docErr);
       }
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      if (err.code === "auth/popup-blocked") {
+      console.error("Google popup sign-in error:", err);
+      if (err.code === "auth/popup-blocked" || err.code === "auth/popup-closed-by-user") {
+        setErrorMsg("Popup blocked or closed by browser. Initiating redirect sign-in...");
         try {
           await signInWithRedirect(auth, provider);
         } catch (redirectErr) {
@@ -541,21 +550,34 @@ function GoogleSignIn({ currentUser }) {
             window.location.hostname +
             "' to Firebase Console -> Authentication -> Settings -> Authorized Domains."
         );
-      } else if (err.code !== "auth/popup-closed-by-user") {
-        setErrorMsg(err.message);
+      } else {
+        setErrorMsg(`Google Auth Error (${err.code}): ${err.message}`);
       }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRedirect = async () => {
+    setLoading(true);
+    setErrorMsg("");
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    try {
+      await signInWithRedirect(auth, provider);
+    } catch (err) {
+      setErrorMsg(err.message);
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="mt-4">
+    <div className="mt-4 space-y-2">
       <button
         type="button"
-        onClick={handle}
+        onClick={handlePopup}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition font-medium text-sm disabled:opacity-50 cursor-pointer"
+        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition font-medium text-sm disabled:opacity-50 cursor-pointer shadow-sm"
       >
         {loading ? (
           <span>Connecting to Google...</span>
@@ -583,6 +605,16 @@ function GoogleSignIn({ currentUser }) {
           </>
         )}
       </button>
+
+      <button
+        type="button"
+        onClick={handleRedirect}
+        disabled={loading}
+        className="w-full text-center text-xs text-indigo-600 dark:text-indigo-400 hover:underline py-1 cursor-pointer"
+      >
+        Popup issues? Click here to Sign in via Redirect
+      </button>
+
       {errorMsg && (
         <div className="mt-3 p-3 rounded-xl text-xs bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 break-words">
           {errorMsg}
